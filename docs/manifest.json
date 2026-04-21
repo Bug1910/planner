@@ -1,11 +1,11 @@
 {
-    "name": "my_planner",
-    "short_name": "my_planner",
+    "name": "剩餘價值 · 排班日曆",
+    "short_name": "剩餘價值",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F5EFE6",
+    "theme_color": "#F5EFE6",
+    "description": "個人排班日曆與薪資追蹤 App",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
