@@ -35,10 +35,112 @@
   <title>剩餘價值 · 排班日曆</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- Firebase Web SDK (compat 版供 FlutterFire 使用) -->
+  <!-- Firebase Web SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script>
+    // 直接用 Firebase Web SDK 做登入 + Firestore,Dart 端透過 window.myplanner 呼叫
+    (function() {
+      var firebaseConfig = {
+        apiKey: "AIzaSyDs_Ik95a1MKJwJ_ZWklABKGzleJK_MaR0",
+        authDomain: "myplanner-production.firebaseapp.com",
+        projectId: "myplanner-production",
+        storageBucket: "myplanner-production.firebasestorage.app",
+        messagingSenderId: "212632256304",
+        appId: "1:212632256304:web:2cd8696f5e81aa2e99d2f5"
+      };
+      try {
+        firebase.initializeApp(firebaseConfig);
+      } catch (e) {
+        console.warn('Firebase init error:', e);
+      }
+
+      var mp = {
+        ready: typeof firebase !== 'undefined' &&
+               typeof firebase.auth === 'function' &&
+               typeof firebase.firestore === 'function',
+        currentUserEmail: null,
+        currentUserUid: null,
+        _authListener: null,
+
+        _updateUser: function(user) {
+          if (user) {
+            mp.currentUserEmail = user.email;
+            mp.currentUserUid = user.uid;
+          } else {
+            mp.currentUserEmail = null;
+            mp.currentUserUid = null;
+          }
+          if (mp._authListener) { try { mp._authListener(); } catch(_){} }
+        },
+
+        signIn: function() {
+          return new Promise(function(resolve, reject) {
+            var provider = new firebase.auth.GoogleAuthProvider();
+            provider.addScope('email');
+            provider.addScope('profile');
+            firebase.auth().signInWithPopup(provider)
+              .then(function(r) { resolve(r.user ? r.user.email : null); })
+              .catch(function(err) {
+                // popup 被擋 → 改用跳轉
+                if (err && (err.code === 'auth/popup-blocked' ||
+                            err.code === 'auth/popup-closed-by-user' ||
+                            err.code === 'auth/cancelled-popup-request')) {
+                  firebase.auth().signInWithRedirect(provider)
+                    .then(function(){ resolve(null); })
+                    .catch(function(e2){ reject(e2.message || String(e2)); });
+                } else {
+                  reject(err.message || String(err));
+                }
+              });
+          });
+        },
+
+        signOut: function() {
+          return firebase.auth().signOut();
+        },
+
+        onAuthChange: function(cb) {
+          mp._authListener = cb;
+        },
+
+        loadData: function() {
+          return new Promise(function(resolve, reject) {
+            var user = firebase.auth().currentUser;
+            if (!user) { resolve(null); return; }
+            firebase.firestore().collection('users').doc(user.uid).get()
+              .then(function(doc) {
+                resolve(doc.exists ? JSON.stringify(doc.data()) : null);
+              })
+              .catch(function(err) { reject(err.message || String(err)); });
+          });
+        },
+
+        saveData: function(jsonStr) {
+          return new Promise(function(resolve, reject) {
+            var user = firebase.auth().currentUser;
+            if (!user) { resolve(false); return; }
+            try {
+              var data = JSON.parse(jsonStr);
+              data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+              firebase.firestore().collection('users').doc(user.uid).set(data)
+                .then(function(){ resolve(true); })
+                .catch(function(err){ reject(err.message || String(err)); });
+            } catch (e) {
+              reject(e.message || String(e));
+            }
+          });
+        }
+      };
+
+      try {
+        firebase.auth().onAuthStateChanged(mp._updateUser);
+      } catch (e) { console.warn('auth listen failed', e); }
+
+      window.myplanner = mp;
+    })();
+  </script>
 
   <style>
     html, body {
